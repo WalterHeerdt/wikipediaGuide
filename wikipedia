@@ -1,15 +1,29 @@
 import requests
 from geopy.geocoders import Nominatim
 import wikipediaapi
+from geopy.exc import GeocoderTimedOut
 
 # Obtenir la latitude et la longitude de la géolocalisation du smartphone
 def get_coordinates():
     geolocator = Nominatim(user_agent="geoapiExercises")
+    max_attempts = 5
+    for _ in range(max_attempts):
+        try:
+            location = geolocator.geocode("")
+            if location is not None:
+                return location.latitude, location.longitude
+        except GeocoderTimedOut:
+            pass
+    return None
+
+# Obtenir les coordonnées de la page Wikipedia en utilisant le nom du lieu
+def get_page_coordinates(place_name):
+    geolocator = Nominatim(user_agent="geoapiExercises")
     try:
-        location = geolocator.geocode("")
+        location = geolocator.geocode(place_name)
         return location.latitude, location.longitude
-    except:
-        return None
+    except GeocoderTimedOut:
+        return get_page_coordinates(place_name)
 
 # Obtenir l'intro de Wikipedia en fonction du nom du lieu
 def get_wikipedia_intro(place_name):
@@ -21,23 +35,37 @@ def get_wikipedia_intro(place_name):
     search_results = requests.get(f"https://fr.wikipedia.org/w/api.php?action=opensearch&search={place_name}&format=json").json()
     if len(search_results) > 1 and len(search_results[1]) > 0:
         page = wiki_wiki.page(search_results[1][0])
-        intro = page.text.split('\n\n')[0]  # Récupérer le premier paragraphe
-        return intro
+        intro = page.text.split('\n\n\n')[0]  # Récupérer le premier paragraphe
+        return intro, search_results[1][0]
     else:
-        return "Aucune information trouvée."
+        return "Aucune information trouvée.", ""
 
 # Obtenir les coordonnées
 coordinates = get_coordinates()
 
 if coordinates is None:
+
     # Demander à l'utilisateur de saisir manuellement le nom du lieu
     place_name = input("Entrez le nom du lieu : ")
 
     # Obtenir l'intro de Wikipedia en utilisant le nom du lieu
-    intro = get_wikipedia_intro(place_name)
+    intro, page_name = get_wikipedia_intro(place_name)
+
+    # Obtenir les coordonnées de la page Wikipedia en utilisant le nom du lieu
+    page_coordinates = get_page_coordinates(place_name)
 else:
     # Obtenir l'intro de Wikipedia en utilisant les coordonnées géographiques (non disponible dans wikipediaapi)
-    intro = "Les coordonnées géographiques ne sont pas prises en charge dans cette version de Wikipedia."
+    intro, page_name = "Les coordonnées géographiques ne sont pas prises en charge dans cette version de Wikipedia.", ""
 
-# Afficher l'intro
-print(intro)
+    # Utiliser les coordonnées de la géolocalisation du smartphone pour la page Wikipedia
+    page_coordinates = coordinates
+
+# Écrire les informations dans le fichier PHP avec l'encodage UTF-8
+with open("information.php", "a", encoding="utf-8") as file:
+    file.write("<?php\n")
+    if coordinates is not None:
+        file.write("$latitude = {};".format(coordinates[0]))
+        file.write("$longitude = {};".format(coordinates[1]))
+    file.write("$pageName = '{}';".format(page_name))
+    file.write("$intro = '{}';".format(intro.replace("'", "\\'")))
+    file.write("?>\n")
