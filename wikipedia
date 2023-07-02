@@ -1,0 +1,43 @@
+import requests
+from geopy.geocoders import Nominatim
+import wikipediaapi
+
+# Obtenir la latitude et la longitude de la géolocalisation du smartphone
+def get_coordinates():
+    geolocator = Nominatim(user_agent="geoapiExercises")
+    try:
+        location = geolocator.geocode("")
+        return location.latitude, location.longitude
+    except:
+        return None
+
+# Obtenir l'intro de Wikipedia en fonction du nom du lieu
+def get_wikipedia_intro(place_name):
+    wiki_wiki = wikipediaapi.Wikipedia(
+        language='fr',
+        extract_format=wikipediaapi.ExtractFormat.WIKI,
+        user_agent='Your_User_Agent_Name'
+    )
+    search_results = requests.get(f"https://fr.wikipedia.org/w/api.php?action=opensearch&search={place_name}&format=json").json()
+    if len(search_results) > 1 and len(search_results[1]) > 0:
+        page = wiki_wiki.page(search_results[1][0])
+        intro = page.text.split('\n\n')[0]  # Récupérer le premier paragraphe
+        return intro
+    else:
+        return "Aucune information trouvée."
+
+# Obtenir les coordonnées
+coordinates = get_coordinates()
+
+if coordinates is None:
+    # Demander à l'utilisateur de saisir manuellement le nom du lieu
+    place_name = input("Entrez le nom du lieu : ")
+
+    # Obtenir l'intro de Wikipedia en utilisant le nom du lieu
+    intro = get_wikipedia_intro(place_name)
+else:
+    # Obtenir l'intro de Wikipedia en utilisant les coordonnées géographiques (non disponible dans wikipediaapi)
+    intro = "Les coordonnées géographiques ne sont pas prises en charge dans cette version de Wikipedia."
+
+# Afficher l'intro
+print(intro)
